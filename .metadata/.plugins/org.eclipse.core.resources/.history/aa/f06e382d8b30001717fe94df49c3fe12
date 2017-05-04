@@ -1,0 +1,335 @@
+package crappy.weather.application;
+	
+import static java.awt.RenderingHints.KEY_RENDERING;
+import static java.awt.RenderingHints.VALUE_RENDER_QUALITY;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.Graphics2D;
+import java.awt.GridLayout;
+import java.awt.Image;
+import java.awt.RenderingHints;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.image.BufferedImage;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.sql.Date;
+import java.util.ArrayList;
+
+import javax.imageio.ImageIO;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingConstants;
+import javax.swing.UIManager;
+import javax.swing.UIManager.LookAndFeelInfo;
+import javax.swing.border.Border;
+import javax.swing.border.TitledBorder;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
+import org.springframework.scheduling.annotation.EnableScheduling;
+
+import crappy.weather.application.entities.City;
+import crappy.weather.application.statistics.Prediction;
+import crappy.weather.application.statistics.Statistics;
+
+/**
+ * Main class for the Weather Application.
+ * <p>
+ * @author Charles Villareal, Clinton Watson, Madeline White
+ */
+@SpringBootApplication
+@EnableScheduling
+@EnableJpaRepositories //(basePackages = "crappy.weather.application.database")
+@SuppressWarnings("unused")
+public class WeatherApplication extends JFrame {
+
+	private static final long serialVersionUID = 5827740357171444548L;
+	
+	static Statistics statistics;
+	
+//	static Prediction prediction;
+
+	
+	/**
+	 * Main method for Weather Application.
+	 * 
+	 * @param args Application arguments.
+	 * @throws FileNotFoundException Thrown when the file is not found.
+	 */
+	public static void main(String[] args) throws FileNotFoundException {
+		WeatherApplication weatherUI = new WeatherApplication();
+		weatherUI.setVisible(true);
+		
+		ConfigurableApplicationContext context = SpringApplication.run(WeatherApplication.class, args);
+		
+		statistics = (Statistics) context.getBean("statistics");
+		
+		System.out.println(statistics);
+	}  
+	
+	
+	private City selectedCity;
+		
+	private JScrollPane scrollPanel;
+	
+	private JPanel panel;
+	private JPanel topContainer;
+	private JPanel topPanel;
+	private JPanel topleft;
+	private JPanel topright;
+	private JPanel centerContainer;
+	private JPanel leftPanel;
+	private JPanel rightPanel;
+	
+	private JComboBox<String> citySelectcomboBox;
+	
+	private JButton fetchButton;
+	private JButton predictButton;
+	
+	private JTextField fieldLatestTemp;
+	private JTextField fieldHourlyPrecip;
+	private JTextField fieldRelHumid;
+	
+	
+	/**
+	 * Constructor.
+	 */
+	public WeatherApplication() {
+		try {
+		    for (LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
+		        if ("Nimbus".equals(info.getName())) {
+		            UIManager.setLookAndFeel(info.getClassName());
+		            break;
+		        }
+		    }
+		} catch (Exception e) { 
+			e.printStackTrace();		} 
+		setBounds(100, 100, 1150, 550);
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setLocation(0,0);
+        this.setTitle("Crappy Weather Application");
+		setLayout(new BorderLayout(0, 0));
+		
+		Color darkBlue = new Color(0,0,139); 
+		Color offWhite = new Color(255,255,255); 
+		Color medGray = new Color(235,235,255);
+		Color lightGray = new Color(245,245,245);
+		Color gray = new Color(125,125,125);
+		Border darkBlueLine = BorderFactory.createLineBorder(darkBlue);
+		Border blueLine = BorderFactory.createLineBorder(Color.blue);
+
+		scrollPanel = new JScrollPane();
+		panel = new JPanel();
+		panel.setLayout(new BorderLayout());
+		panel.setBorder(blueLine);
+		add(scrollPanel);
+		scrollPanel.setViewportView(panel);
+		
+		topContainer  = new JPanel();
+		topContainer.setLayout(new BorderLayout());
+		panel.add(topContainer, BorderLayout.NORTH);
+		topPanel = new JPanel();
+		topPanel.setLayout(new GridLayout(0,2));
+		topContainer.add(topPanel, BorderLayout.CENTER);
+		
+		topleft = new JPanel();
+		topleft.setLayout(new FlowLayout(FlowLayout.LEFT));
+		topleft.setBorder(darkBlueLine);
+		topleft.setBackground(offWhite);
+		topleft.add(Box.createHorizontalStrut(10));
+		
+		BufferedImage myPicture = null;
+		try {
+			myPicture = ImageIO.read(new File("src/main/resources/CPALogo.jpg"));
+			myPicture = resize(myPicture,150,150);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		JLabel picLabel = new JLabel(new ImageIcon(myPicture));		
+		
+		JLabel lblCitySelect = new JLabel("Select City:");
+		lblCitySelect.setFont(new Font("Arial", Font.PLAIN, 22));
+		topleft.add(picLabel);
+		topleft.add(Box.createHorizontalStrut(1));
+		topleft.add(lblCitySelect);
+		topleft.add(Box.createHorizontalStrut(1));
+		
+		citySelectcomboBox = new JComboBox<String>();
+		citySelectcomboBox.setFont(new Font("Arial", Font.PLAIN, 20));
+		citySelectcomboBox.setPreferredSize(new Dimension(175,45));
+		citySelectcomboBox.setMaximumRowCount(20);
+		populateComboBox();
+		getSelectedCity();
+		topleft.add(citySelectcomboBox);
+		topleft.add(Box.createHorizontalStrut(5));
+		
+		fetchButton = new JButton("Go");
+		fetchButton.setFont(new Font("Arial", Font.BOLD, 19));
+		fetchButton.setPreferredSize(new Dimension(90,40));
+		topleft.add(fetchButton);
+		topPanel.add(topleft);
+		
+		topright = new JPanel();
+		topright.setLayout(new FlowLayout(FlowLayout.LEFT));
+		topright.setBorder(darkBlueLine);
+		topright.setBackground(offWhite);
+		topright.add(Box.createHorizontalStrut(10));
+		
+		JLabel lblPredictBtn = new JLabel("Get Prediction:");
+		lblPredictBtn.setFont(new Font("Arial", Font.PLAIN, 22));
+		topright.add(lblPredictBtn);
+		topright.add(Box.createHorizontalStrut(1));
+		
+		predictButton = new JButton("Predict");
+		predictButton.setPreferredSize(new Dimension(125,40));
+		predictButton.setFont(new Font("Arial", Font.BOLD, 19));
+		topright.add(predictButton);
+		topPanel.add(topright);
+		
+		centerContainer = new JPanel();
+		centerContainer.setLayout(new GridLayout(0,2));
+		panel.add(centerContainer, BorderLayout.CENTER);
+		
+		leftPanel = new JPanel();
+		leftPanel.setBorder(BorderFactory.createTitledBorder(null, "Weather Data", TitledBorder.LEFT, TitledBorder.TOP, new Font("Arial Rounded MT Bold", Font.BOLD, 21), Color.blue));
+		leftPanel.setLayout(new GridLayout(0,2));	
+		leftPanel.setPreferredSize(new Dimension(450,425));
+		centerContainer.add(leftPanel);
+			
+		JLabel lblLatestTemp = new JLabel("  Air Temperature:");
+		lblLatestTemp.setFont(new Font("Arial", Font.PLAIN, 18));
+		lblLatestTemp.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 0, gray));
+		lblLatestTemp.setBackground(medGray);
+		lblLatestTemp.setOpaque(true);
+		leftPanel.add(lblLatestTemp);
+			
+		fieldLatestTemp = new JTextField();
+		fieldLatestTemp.setFont(new Font("Arial", Font.PLAIN, 18));
+		fieldLatestTemp.setBorder(BorderFactory.createMatteBorder(2, 0, 2, 2, gray));
+		fieldLatestTemp.setBackground(lightGray);
+		fieldLatestTemp.setEditable(false);
+		leftPanel.add(fieldLatestTemp);
+		
+		JLabel lblHourlyPrecip = new JLabel("  Precipitation (Hourly):");
+		lblHourlyPrecip.setFont(new Font("Arial", Font.PLAIN, 18));
+		lblHourlyPrecip.setBackground(medGray);
+		lblHourlyPrecip.setOpaque(true);
+		lblHourlyPrecip.setBorder(BorderFactory.createMatteBorder(2, 2, 2, 0, gray));
+		leftPanel.add(lblHourlyPrecip);
+			
+		fieldHourlyPrecip = new JTextField();
+		fieldHourlyPrecip.setFont(new Font("Arial", Font.PLAIN, 18));
+		fieldHourlyPrecip.setBorder(BorderFactory.createMatteBorder(2, 0, 2, 2, gray));
+		fieldHourlyPrecip.setBackground(lightGray);
+		fieldHourlyPrecip.setEditable(false);
+		leftPanel.add(fieldHourlyPrecip);
+
+		JLabel lblRelHumid = new JLabel("  Relative Humidity:");
+		lblRelHumid.setFont(new Font("Arial", Font.PLAIN, 18));
+		lblRelHumid.setBorder(BorderFactory.createMatteBorder(2, 2, 4, 0, gray));
+		lblRelHumid.setBackground(medGray);
+		lblRelHumid.setOpaque(true);
+		leftPanel.add(lblRelHumid);
+			
+		fieldRelHumid = new JTextField();
+		fieldRelHumid.setFont(new Font("Arial", Font.PLAIN, 18));
+		fieldRelHumid.setBorder(BorderFactory.createMatteBorder(2, 0, 4, 2, gray));
+		fieldRelHumid.setBackground(lightGray);
+		fieldRelHumid.setEditable(false);
+		leftPanel.add(fieldRelHumid);
+		
+		leftPanel.add(Box.createHorizontalStrut(10));
+		leftPanel.add(Box.createHorizontalStrut(10));
+		leftPanel.add(Box.createHorizontalStrut(10));
+		leftPanel.add(Box.createHorizontalStrut(10));
+				
+		rightPanel = new JPanel();
+		rightPanel.setBorder(BorderFactory.createTitledBorder(null, "Weather Prediction", TitledBorder.LEFT, TitledBorder.TOP, new Font("Arial Rounded MT Bold", Font.BOLD, 21), Color.blue));
+		rightPanel.setLayout(new GridLayout(0,1));
+		rightPanel.setPreferredSize(new Dimension(450,425));
+		centerContainer.add(rightPanel);
+		
+		JTextArea predictText = new JTextArea();
+		predictText.setFont(new Font("Arial", Font.PLAIN, 22));
+		rightPanel.add(predictText);
+		
+		rightPanel.add(Box.createHorizontalStrut(10));
+		
+		fetchButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {	
+				System.out.println(selectedCity.getName());
+				System.out.println(statistics.getCurrentPrecipitation("BARROW"));
+				//fieldLatestTemp.setText("  " + statistics.getCurrentTemperature(selectedCity.getName()) + " Celsius");
+				//fieldHourlyPrecip.setText("  " + statistics.getCurrentPrecipitation(selectedCity.getName()) + " Inches");
+				//fieldRelHumid.setText("  " + statistics.getCurrentHumidity(selectedCity.getName()) + " %");
+			}}); 
+	
+		citySelectcomboBox.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {	
+				getSelectedCity();
+				//System.out.println(selectedCity.getName());
+			}});  
+	
+		predictButton.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				// predictText.setText("  " + Prediction.getWeatherPrediction(selectedCity.getName()));
+				System.out.println("Predicting weather action");
+			}}); 
+	} 
+	
+	
+	public static BufferedImage resize(BufferedImage image, int width, int height) {
+	    BufferedImage bi = new BufferedImage(width, height, BufferedImage.TRANSLUCENT);
+	    Graphics2D g2d = (Graphics2D) bi.createGraphics();
+	    g2d.addRenderingHints(new RenderingHints(KEY_RENDERING, VALUE_RENDER_QUALITY));
+	    g2d.drawImage(image, 0, 0, width, height, null);
+	    g2d.dispose();
+	    return bi;
+	}
+
+	
+	private void populateComboBox() {
+		ArrayList<String> cityList = new ArrayList<String>(); 
+		for (City city : City.values()) {
+			   String cityString = city.getName() + ", " + city.getState();
+			   cityList.add(cityString);
+			   
+			}
+		String[] array = cityList.toArray(new String[cityList.size()]);
+		citySelectcomboBox.setModel(new DefaultComboBoxModel<String>(array));
+	}
+	
+	
+	private void getSelectedCity() {
+		String selection = (String) citySelectcomboBox.getSelectedItem();
+		int splitBy = selection.indexOf(",");
+		selection = selection.substring(0, splitBy);
+		for (City city : City.values()) {
+			  if(selection.equals(city.getName())) {
+				  selectedCity = city;
+				  return;
+			}
+		}
+	}
+}   
